@@ -4,26 +4,24 @@
 """Configuration of the BOP Toolkit."""
 
 import os
-
+from dotenv import load_dotenv
 
 ######## Basic ########
+load_dotenv() 
 
 # Folder with the BOP datasets.
-if "BOP_PATH" in os.environ:
-    datasets_path = os.environ["BOP_PATH"]
-else:
-    datasets_path = r"./datasets"
+datasets_path = os.getenv("DATA_DIR", None)
 
 # Folder with pose results to be evaluated.
-results_path = r"./results"
+results_path = os.getenv("RESULTS_DIR", None)
 
 # Folder for the calculated pose errors and performance scores.
-eval_path = r"./eval"
+eval_path = os.getenv("EVAL_DIR", None)
 
 ######## Extended ########
 
 # Folder for outputs (e.g. visualizations).
-output_path = r"./output"
+output_path = os.getenv("OUTPUT_DIR", None)
 
 # For offscreen C++ rendering: Path to the build folder of bop_renderer (github.com/thodan/bop_renderer).
 bop_renderer_path = r"/path/to/bop_renderer/build"
