@@ -10,18 +10,18 @@ from dotenv import load_dotenv
 load_dotenv() 
 
 # Folder with the BOP datasets.
-datasets_path = os.getenv("DATA_DIR", None)
+datasets_path = os.getenv("DATA_DIR", 'dataset')
 
 # Folder with pose results to be evaluated.
-results_path = os.getenv("RESULTS_DIR", None)
+results_path = os.getenv("RESULTS_DIR", 'results')
 
 # Folder for the calculated pose errors and performance scores.
-eval_path = os.getenv("EVAL_DIR", None)
+eval_path = os.getenv("EVAL_DIR", 'eval')
 
 ######## Extended ########
 
 # Folder for outputs (e.g. visualizations).
-output_path = os.getenv("OUTPUT_DIR", None)
+output_path = os.getenv("OUTPUT_DIR", 'output')
 
 # For offscreen C++ rendering: Path to the build folder of bop_renderer (github.com/thodan/bop_renderer).
 bop_renderer_path = r"/path/to/bop_renderer/build"
