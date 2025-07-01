@@ -1,30 +1,26 @@
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "bop_toolkit_lib"
-authors = [
-   {"name" = "Tomas Hodan"},  
-   {"name" = "Martin Sundermeyer"},  
-]
+name = "bop-toolkit-lib"
 version = "0.1.0"
-description = "A Python toolkit of the BOP benchmark for 6D object pose estimation (http://bop.felk.cvut.cz)."
+description = "Add your description here"
+readme = "README.md"
 license = {text = "MIT license"}
+authors = [
+    { name = "Simon Thimm", email = "2023463@stud.hs-mannheim.de" }
+]
 requires-python = ">=3.8"
 dependencies = [
-    "pypng>=0.20220715.0",
-    "pytz>=2025.2",
-    "webdataset>=0.2.100",
-    "pyopengl>=3.1.0",
     "imageio>=2.35.1",
+    "numpy>=1.24.4",
+    "pandas>=2.0.3",
+    "pyopengl>=3.1.9",
+    "pypng>=0.20220715.0",
+    "python-dotenv>=1.0.1",
+    "pytz>=2025.2",
     "scikit-image>=0.21.0",
     "scipy>=1.10.1",
     "vispy>=0.14.2",
-    "python-dotenv>=1.0.1",
-    "numpy>=1.24.4",
+    "webdataset>=0.2.100",
 ]
-
 
 [project.optional-dependencies]
 eval_coco = ["pycocotools@git+https://github.com/MartinSmeyer/cocoapi.git#subdirectory=PythonAPI"]
@@ -37,12 +33,12 @@ scripts = [
     "trimesh>=4.6.11",
 ]
 
-[tool.setuptools.package-data]
-bop_toolkit_lib = ["*"]
+[tool.hatch.metadata]
+allow-direct-references = true
 
-[tool.setuptools]
-packages = {find = {exclude = ["docs"]}}
+[project.scripts]
+test = "test:main"
 
-[tool.setuptools.data-files]
-"share/ament_index/resource_index/packages" = ["resource/bop_toolkit_lib"]
-"share/bop_toolkit_lib" = ["package.xml"]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
