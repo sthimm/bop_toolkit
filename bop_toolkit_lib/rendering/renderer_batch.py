@@ -1,7 +1,8 @@
 # Author: Van Nguyen Nguyen (van-nguyen.nguyen@enpc.fr)
 
-"""Simple batch renderer for BOP toolkit, designed for parallel vsd computation
-"""
+"""Simple batch renderer for BOP toolkit, designed for parallel vsd computation"""
+
+import sys
 import os
 
 import multiprocessing
@@ -96,7 +97,7 @@ class BatchRenderer:
         cmds = []
         for worker_id in range(num_workers_used):
             cmd = [
-                "python",                
+                sys.executable,
                 str(LIB_DIR / "call_vsd_worker.py"),
                 f"--input_dir={self.tmp_dir}",
                 f"--worker_id={worker_id}",

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import sys
 import os
 import re
 import time
@@ -14,7 +15,7 @@ from bop_toolkit_lib import misc
 # PARAMETERS (some can be overwritten by the command line arguments below).
 ################################################################################
 p = {
-    # Use generate results from gt files instead of submissions 
+    # Use generate results from gt files instead of submissions
     "gt_from_datasets": [],  # e.g. ['ycbv', 'lmo']
     "targets_filename": "test_targets_bop19.json",
     "renderer_type": "vispy",  # Options: 'vispy', 'cpp', 'python'.
@@ -24,7 +25,9 @@ p = {
 }
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--gt_from_datasets", default="", help='Comma separated list of dataset names, e.g. "ycbv,tless,lmo"', type=str)
+parser.add_argument(
+    "--gt_from_datasets", default="", help='Comma separated list of dataset names, e.g. "ycbv,tless,lmo"', type=str
+)
 parser.add_argument("--targets_filename", default=p["targets_filename"])
 parser.add_argument("--renderer_type", default=p["renderer_type"])
 parser.add_argument("--use_gpu", action="store_true", default=p["use_gpu"])
@@ -33,7 +36,7 @@ parser.add_argument("--tolerance", default=p["tolerance"], type=float)
 args = parser.parse_args()
 
 p["renderer_type"] = str(args.renderer_type)
-p["gt_from_datasets"] = args.gt_from_datasets.split(',') if len(args.gt_from_datasets) > 0 else [] 
+p["gt_from_datasets"] = args.gt_from_datasets.split(",") if len(args.gt_from_datasets) > 0 else []
 p["targets_filename"] = str(args.targets_filename)
 p["num_workers"] = int(args.num_workers)
 p["use_gpu"] = bool(args.use_gpu)
@@ -94,10 +97,7 @@ EXPECTED_OUTPUT = {
 # If using ground truth datasets, redefine result files and expected results
 if len(p["gt_from_datasets"]) > 0:
     RESULT_PATH = "./bop_toolkit_lib/tests/data/results_gt"
-    FILE_DICTIONARY = {
-        f"{ds}_gt": f"gt-results_{ds}-test_pose.csv"
-        for ds in p["gt_from_datasets"]
-    }
+    FILE_DICTIONARY = {f"{ds}_gt": f"gt-results_{ds}-test_pose.csv" for ds in p["gt_from_datasets"]}
     EXPECTED_OUTPUT = {
         f"{ds}_gt": {
             "bop19_average_recall_vsd": 1.0,
@@ -112,16 +112,14 @@ if len(p["gt_from_datasets"]) > 0:
 assert FILE_DICTIONARY.keys() == EXPECTED_OUTPUT.keys()
 
 # Loop through each entry in the dictionary and execute the command
-for dataset_method_name, file_name in tqdm(
-    FILE_DICTIONARY.items(), desc="Executing..."
-):
+for dataset_method_name, file_name in tqdm(FILE_DICTIONARY.items(), desc="Executing..."):
     log_file_path = f"{LOGS_PATH}/eval_bop19_pose_test_{dataset_method_name}.txt"
     # Remove eval sub path to start clean
-    eval_path_dir = os.path.join(EVAL_PATH, file_name.split('.')[0])
+    eval_path_dir = os.path.join(EVAL_PATH, file_name.split(".")[0])
     if os.path.exists(eval_path_dir):
         shutil.rmtree(eval_path_dir)
     command = [
-        "python",
+        sys.executable,
         "scripts/eval_bop19_pose.py",
         "--renderer_type",
         p["renderer_type"],
@@ -145,7 +143,7 @@ for dataset_method_name, file_name in tqdm(
     with open(log_file_path, "a") as output_file:
         returncode = subprocess.run(command, stdout=output_file, stderr=subprocess.STDOUT).returncode
         if returncode != 0:
-            misc.log('FAILED: '+command_str)
+            misc.log("FAILED: " + command_str)
     end_time = time.perf_counter()
     misc.log(f"Evaluation time for {dataset_method_name}: {end_time - start_time} seconds")
 
@@ -162,9 +160,7 @@ for dataset_method_name, _ in tqdm(FILE_DICTIONARY.items(), desc="Verifying...")
     log_content = "".join(last_lines)
 
     # Extract scores using regular expressions
-    scores = {
-        key: float(value) for key, value in re.findall(r"- (\S+): (\S+)", log_content)
-    }
+    scores = {key: float(value) for key, value in re.findall(r"- (\S+): (\S+)", log_content)}
 
     # Compare the extracted scores with the expected scores
     for key, expected_value in EXPECTED_OUTPUT[dataset_method_name].items():
@@ -173,9 +169,7 @@ for dataset_method_name, _ in tqdm(FILE_DICTIONARY.items(), desc="Verifying...")
             if abs(actual_value - expected_value) < p["tolerance"]:
                 misc.log(f"{dataset_method_name}: {key}: {actual_value} - PASSED")
             else:
-                misc.log(
-                    f"{dataset_method_name}: {key} - FAILED. Expected: {expected_value}, Actual: {actual_value}"
-                )
+                misc.log(f"{dataset_method_name}: {key} - FAILED. Expected: {expected_value}, Actual: {actual_value}")
         else:
             misc.log(f"{dataset_method_name}: {key} - NOT FOUND")
 

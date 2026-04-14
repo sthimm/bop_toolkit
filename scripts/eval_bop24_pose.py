@@ -3,6 +3,7 @@
 
 """Evaluation script for the BOP Challenge 2023/2024."""
 
+import sys
 import os
 import time
 import argparse
@@ -28,12 +29,7 @@ p = {
             "type": "mssd",
             "correct_th": [[th] for th in np.arange(0.05, 0.51, 0.05)],
         },
-        {
-            "n_top": 0,
-            "type": "mssd",
-            "correct_th": [[th] for th in range(2,21,2)],
-            "threshold_unit": "mm"
-        },
+        {"n_top": 0, "type": "mssd", "correct_th": [[th] for th in range(2, 21, 2)], "threshold_unit": "mm"},
         {
             "n_top": 0,
             "type": "mspd",
@@ -60,6 +56,8 @@ p = {
     "results_path": config.results_path,
     # Folder for the calculated pose errors and performance scores.
     "eval_path": config.eval_path,
+    # Folder containing the BOP datasets.
+    "datasets_path": config.datasets_path,
     # File with a list of estimation targets to consider. The file is assumed to
     # be stored in the dataset folder.
     "targets_filename": "test_targets_bop24.json",
@@ -78,17 +76,20 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--renderer_type", type=str, default=p["renderer_type"])
 parser.add_argument(
     "--result_filenames",
-     type=str,
+    type=str,
     default=",".join(p["result_filenames"]),
     help="Comma-separated names of files with results.",
 )
 parser.add_argument("--results_path", type=str, default=p["results_path"])
 parser.add_argument("--eval_path", type=str, default=p["eval_path"])
 parser.add_argument("--targets_filename", type=str, default=p["targets_filename"])
+parser.add_argument("--datasets_path", type=str, default=p["datasets_path"])
 parser.add_argument("--num_workers", type=int, default=p["num_workers"])
 parser.add_argument("--use_gpu", action="store_true", default=p["use_gpu"])
 parser.add_argument("--device", type=str, default=p["device"])
-parser.add_argument("--cleanup_eval", action="store_true", default=False, help="Delete error folders after evaluation (default: False)")
+parser.add_argument(
+    "--cleanup_eval", action="store_true", default=False, help="Delete error folders after evaluation (default: False)"
+)
 args = parser.parse_args()
 
 result_filenames = args.result_filenames.split(",")
@@ -114,7 +115,9 @@ for result_filename in result_filenames:
 
     # Load and check results, calculate the average estimation time per image.
     result_path = os.path.join(args.results_path, result_filename)
-    ests = inout.load_bop_results(result_path, version="bop19", max_num_estimates_per_image=p["max_num_estimates_per_image"])
+    ests = inout.load_bop_results(
+        result_path, version="bop19", max_num_estimates_per_image=p["max_num_estimates_per_image"]
+    )
     check_passed, check_msg, times, times_available = inout.check_consistent_timings(ests, "im_id")
     if not check_passed:
         raise ValueError(check_msg)
@@ -125,9 +128,11 @@ for result_filename in result_filenames:
     # Evaluate the pose estimates.
     for error in p["errors"]:
         # Calculate error of the pose estimates.
-        calc_error_script, is_gpu_script_used = misc.get_eval_calc_errors_script_name(args.use_gpu, error["type"], dataset)
+        calc_error_script, is_gpu_script_used = misc.get_eval_calc_errors_script_name(
+            args.use_gpu, error["type"], dataset
+        )
         calc_errors_cmd = [
-            "python",
+            sys.executable,
             os.path.join(
                 os.path.dirname(os.path.realpath(__file__)),
                 calc_error_script,
@@ -140,6 +145,7 @@ for result_filename in result_filenames:
             "--renderer_type={}".format(args.renderer_type),
             "--results_path={}".format(args.results_path),
             "--eval_path={}".format(args.eval_path),
+            "--datasets_path={}".format(args.datasets_path),
             "--targets_filename={}".format(args.targets_filename),
             "--max_sym_disc_step={}".format(p["max_sym_disc_step"]),
             "--skip_missing=1",
@@ -165,31 +171,24 @@ for result_filename in result_filenames:
         for error_sign, error_dir_path in error_dir_paths.items():
             for correct_th in error["correct_th"]:
                 calc_scores_cmd = [
-                    "python",
+                    sys.executable,
                     os.path.join(
                         os.path.dirname(os.path.realpath(__file__)),
                         "eval_calc_scores.py",
                     ),
                     "--error_dir_paths={}".format(error_dir_path),
                     "--eval_path={}".format(args.eval_path),
+                    "--datasets_path={}".format(args.datasets_path),
                     "--targets_filename={}".format(args.targets_filename),
                     "--visib_gt_min={}".format(p["visib_gt_min"]),
                     "--eval_mode=detection",
                 ]
                 if "threshold_unit" in error:
-                    calc_scores_cmd += [
-                        "--normalized_by_diameter=[]"
-                    ]
+                    calc_scores_cmd += ["--normalized_by_diameter=[]"]
                 if p["ignore_object_visible_less_than_visib_gt_min"]:
-                    calc_scores_cmd += [
-                        "--ignore_object_visible_less_than_visib_gt_min"
-                    ]
+                    calc_scores_cmd += ["--ignore_object_visible_less_than_visib_gt_min"]
 
-                calc_scores_cmd += [
-                    "--correct_th_{}={}".format(
-                        error["type"], ",".join(map(str, correct_th))
-                    )
-                ]
+                calc_scores_cmd += ["--correct_th_{}={}".format(error["type"], ",".join(map(str, correct_th)))]
                 calc_scores_cmds.append(calc_scores_cmd)
 
         if args.num_workers == 1:
@@ -219,16 +218,12 @@ for result_filename in result_filenames:
                 score_sign = misc.get_score_signature(correct_th, p["visib_gt_min"])
 
                 scores_filename = "scores_{}.json".format(score_sign)
-                scores_path = os.path.join(
-                    args.eval_path, result_name, error_sign, scores_filename
-                )
+                scores_path = os.path.join(args.eval_path, result_name, error_sign, scores_filename)
 
                 # Load the scores and number of instances.
                 logger.info("Loading calculated scores from: {}".format(scores_path))
                 scores = inout.load_json(scores_path)["scores"]
-                num_instances_per_object = inout.load_json(scores_path)[
-                    "num_targets_per_object"
-                ]
+                num_instances_per_object = inout.load_json(scores_path)["num_targets_per_object"]
                 for obj_id in scores:
                     if num_instances_per_object[obj_id] > 0:
                         mAP_scores_per_object.setdefault(obj_id, []).append(scores[obj_id])
@@ -253,9 +248,7 @@ for result_filename in result_filenames:
                     continue
 
                 mAP_over_correct_th = np.mean(mAP_scores_per_object[obj_id])
-                logger.info(
-                    f"mAP, {error['type']}, {obj_id}: {mAP_over_correct_th:.3f}"
-                )
+                logger.info(f"mAP, {error['type']}, {obj_id}: {mAP_over_correct_th:.3f}")
                 mAP_over_correct_ths.append(mAP_over_correct_th)
 
             error_type = error["type"]
@@ -263,9 +256,7 @@ for result_filename in result_filenames:
                 error_type = error_type + "_" + error["threshold_unit"]
 
             mAP_per_error_type[error_type] = np.mean(mAP_over_correct_ths)
-            logger.info(
-                f"{error_type}, Final mAP: {mAP_per_error_type[error_type]:.3f}"
-            )
+            logger.info(f"{error_type}, Final mAP: {mAP_per_error_type[error_type]:.3f}")
 
     time_total = time.time() - time_start
     logger.info("Evaluation of {} took {}s.".format(result_filename, time_total))
@@ -286,19 +277,13 @@ for result_filename in result_filenames:
         final_scores[f"bop24_mAP_{error_type}"] = mAP_per_error_type[error_type]
 
     # Final score for the given dataset.
-    final_scores["bop24_mAP"] = np.mean(
-        [mAP_per_error_type["mssd"], mAP_per_error_type["mspd"]]
-    )
+    final_scores["bop24_mAP"] = np.mean([mAP_per_error_type["mssd"], mAP_per_error_type["mspd"]])
 
     # Final score for the given dataset.
-    final_scores["bop25_mAP"] = np.mean(
-        [mAP_per_error_type["mssd"]]
-    )
+    final_scores["bop25_mAP"] = np.mean([mAP_per_error_type["mssd"]])
 
-        # Final score for the given dataset.
-    final_scores["bop25_mAP_mm"] = np.mean(
-        [mAP_per_error_type["mssd_mm"]]
-    )
+    # Final score for the given dataset.
+    final_scores["bop25_mAP_mm"] = np.mean([mAP_per_error_type["mssd_mm"]])
 
     # Average estimation time per image.
     final_scores["bop24_average_time_per_image"] = average_time_per_image

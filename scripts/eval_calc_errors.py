@@ -25,6 +25,7 @@ logger = misc.get_logger(file_name)
 htt_available = False
 try:
     from bop_toolkit_lib import pose_error_htt
+
     htt_available = True
 except ImportError as e:
     logger.warn("""Missing hand_tracking_toolkit dependency, 
@@ -84,9 +85,7 @@ p = {
     # be stored in the dataset folder.
     "targets_filename": "test_targets_bop19.json",
     # Template of path to the output file with calculated errors.
-    "out_errors_tpath": os.path.join(
-        "{eval_path}", "{result_name}", "{error_sign}", "errors_{scene_id:06d}.json"
-    ),
+    "out_errors_tpath": os.path.join("{eval_path}", "{result_name}", "{error_sign}", "errors_{scene_id:06d}.json"),
     "num_workers": config.num_workers,  # Number of parallel workers for the calculation of errors.
     "eval_mode": "localization",  # Options: 'localization', 'detection'.
     "max_num_estimates_per_image": 100,  # Maximum number of estimates per image. Only used for detection tasks.
@@ -104,9 +103,7 @@ parser.add_argument("--visib_gt_min", default=p["visib_gt_min"])
 parser.add_argument("--error_type", default=p["error_type"])
 parser.add_argument("--vsd_deltas", default=vsd_deltas_str)
 parser.add_argument("--vsd_taus", default=",".join(map(str, p["vsd_taus"])))
-parser.add_argument(
-    "--vsd_normalized_by_diameter", default=p["vsd_normalized_by_diameter"]
-)
+parser.add_argument("--vsd_normalized_by_diameter", default=p["vsd_normalized_by_diameter"])
 parser.add_argument("--max_sym_disc_step", default=p["max_sym_disc_step"])
 parser.add_argument("--skip_missing", default=p["skip_missing"])
 parser.add_argument("--renderer_type", default=p["renderer_type"])
@@ -127,9 +124,7 @@ args = parser.parse_args()
 p["n_top"] = int(args.n_top)
 p["visib_gt_min"] = float(args.visib_gt_min)
 p["error_type"] = str(args.error_type)
-p["vsd_deltas"] = {
-    str(e.split(":")[0]): float(e.split(":")[1]) for e in args.vsd_deltas.split(",")
-}
+p["vsd_deltas"] = {str(e.split(":")[0]): float(e.split(":")[1]) for e in args.vsd_deltas.split(",")}
 p["vsd_taus"] = list(map(float, args.vsd_taus.split(",")))
 p["vsd_normalized_by_diameter"] = bool(args.vsd_normalized_by_diameter)
 p["max_sym_disc_step"] = float(args.max_sym_disc_step)
@@ -163,17 +158,17 @@ for result_filename in p["result_filenames"]:
     split_type_str = " - " + split_type if split_type is not None else ""
 
     # Load dataset parameters.
-    dp_split = dataset_params.get_split_params(
-        p["datasets_path"], dataset, split, split_type
-    )
+    dp_split = dataset_params.get_split_params(p["datasets_path"], dataset, split, split_type)
 
     if dataset == "xyzibd":
         p["max_num_estimates_per_image"] = 200
 
     if p["error_type"] not in dp_split["supported_error_types"]:
-        raise ValueError("""{} error is not among {} """
-                         """supported error types: {}""".format(p["error_type"], dataset, dp_split["supported_error_types"]))
-    
+        raise ValueError(
+            """{} error is not among {} """
+            """supported error types: {}""".format(p["error_type"], dataset, dp_split["supported_error_types"])
+        )
+
     model_type = "eval"
     dp_model = dataset_params.get_model_params(p["datasets_path"], dataset, model_type)
 
@@ -182,9 +177,7 @@ for result_filename in p["result_filenames"]:
     if p["error_type"] in ["ad", "add", "adi", "mssd", "mspd", "proj"]:
         logger.info("Loading object models...")
         for obj_id in dp_model["obj_ids"]:
-            models[obj_id] = inout.load_ply(
-                dp_model["model_tpath"].format(obj_id=obj_id)
-            )
+            models[obj_id] = inout.load_ply(dp_model["model_tpath"].format(obj_id=obj_id))
 
     # Load models info.
     models_info = None
@@ -196,9 +189,7 @@ for result_filename in p["result_filenames"]:
     if p["error_type"] in ["mssd", "mspd"]:
         models_sym = {}
         for obj_id in dp_model["obj_ids"]:
-            models_sym[obj_id] = misc.get_symmetry_transformations(
-                models_info[obj_id], p["max_sym_disc_step"]
-            )
+            models_sym[obj_id] = misc.get_symmetry_transformations(models_info[obj_id], p["max_sym_disc_step"])
 
     # Initialize a renderer.
     ren = None
@@ -206,9 +197,7 @@ for result_filename in p["result_filenames"]:
         logger.info("Initializing renderer...")
         width, height = dp_split["im_size"]
         if p["num_workers"] == 1:
-            ren = renderer.create_renderer(
-                width, height, p["renderer_type"], mode="depth"
-            )
+            ren = renderer.create_renderer(width, height, p["renderer_type"], mode="depth")
         else:
             ren = renderer_batch.BatchRenderer(
                 width,
@@ -216,26 +205,22 @@ for result_filename in p["result_filenames"]:
                 p["renderer_type"],
                 mode="depth",
                 num_workers=p["num_workers"],
-                tmp_dir=os.path.join(
-                    p["results_path"], p["eval_path"], f"tmp{int(time.time())}"
-                ),
+                tmp_dir=os.path.join(p["eval_path"], f"tmp{int(time.time())}"),
             )
         for obj_id in dp_model["obj_ids"]:
             ren.add_object(obj_id, dp_model["model_tpath"].format(obj_id=obj_id))
 
     # Load the estimation targets.
-    targets = inout.load_json(
-        os.path.join(dp_split["base_path"], p["targets_filename"])
-    )
+    targets = inout.load_json(os.path.join(dp_split["base_path"], p["targets_filename"]))
 
     # Organize the targets by scene, image and object.
     logger.info("Organizing estimation targets...")
     # targets_org : {"scene_id": {"im_id": {5: {"im_id": 3, "inst_count": 1, "obj_id": 3, "scene_id": 48}}}}
     targets_org = {}
-    
+
     for target in targets:
         if p["eval_mode"] == "localization":
-            assert "inst_count" in target, "inst_count is required for localization eval_mode" 
+            assert "inst_count" in target, "inst_count is required for localization eval_mode"
             targets_org.setdefault(target["scene_id"], {}).setdefault(target["im_id"], {})[target["obj_id"]] = target
         else:
             targets_org.setdefault(target["scene_id"], {})[target["im_id"]] = target
@@ -243,34 +228,32 @@ for result_filename in p["result_filenames"]:
     # Load pose estimates.
     logger.info("Loading pose estimates...")
     max_num_estimates_per_image = p["max_num_estimates_per_image"] if p["eval_mode"] == "detection" else None
-    ests = inout.load_bop_results(os.path.join(p["results_path"], result_filename), max_num_estimates_per_image=max_num_estimates_per_image)
+    ests = inout.load_bop_results(
+        os.path.join(p["results_path"], result_filename), max_num_estimates_per_image=max_num_estimates_per_image
+    )
 
     # Organize the pose estimates by scene, image and object.
     logger.info("Organizing pose estimates...")
     ests_org = {}
     for est in ests:
-        ests_org.setdefault(est["scene_id"], {}).setdefault(
-            est["im_id"], {}
-        ).setdefault(est["obj_id"], []).append(est)
+        ests_org.setdefault(est["scene_id"], {}).setdefault(est["im_id"], {}).setdefault(est["obj_id"], []).append(est)
 
     for scene_id, scene_targets in targets_org.items():
         logger.info("Processing scene {} of {}...".format(scene_id, dataset))
         tpath_keys = dataset_params.scene_tpaths_keys(dp_split["eval_modality"], dp_split["eval_sensor"], scene_id)
 
         # Load GT poses for the current scene.
-        scene_gt = inout.load_scene_gt(
-            dp_split[tpath_keys["scene_gt_tpath"]].format(scene_id=scene_id)
-        )
+        scene_gt = inout.load_scene_gt(dp_split[tpath_keys["scene_gt_tpath"]].format(scene_id=scene_id))
         # Load info about the GT poses (e.g. visibility) for the current scene.
         scene_gt_info = inout.load_json(
             dp_split[tpath_keys["scene_gt_info_tpath"]].format(scene_id=scene_id), keys_to_int=True
         )
-        # Load ground truth camera 
+        # Load ground truth camera
         scene_camera = inout.load_scene_camera(dp_split[tpath_keys["scene_camera_tpath"]].format(scene_id=scene_id))
 
         # collect all the images and their targets
         im_meta_datas = []
-        
+
         for im_ind, (im_id, im_targets) in enumerate(scene_targets.items()):
             im_meta_data = [im_ind, (im_id, im_targets)]
             im_meta_datas.append(im_meta_data)
@@ -282,8 +265,7 @@ for result_filename in p["result_filenames"]:
             per_image_ests_counter = 0
             if im_ind % 10 == 0:
                 logger.info(
-                    "Calculating error {} - method: {}, dataset: {}{}, scene: {}, "
-                    "im: {}".format(
+                    "Calculating error {} - method: {}, dataset: {}{}, scene: {}, im: {}".format(
                         p["error_type"],
                         method,
                         dataset,
@@ -293,7 +275,7 @@ for result_filename in p["result_filenames"]:
                     )
                 )
 
-            # Try extracting either a K or a CameraModel from scene camera parameters 
+            # Try extracting either a K or a CameraModel from scene camera parameters
             K = None
             cam = None
             if "cam_K" in scene_camera[im_id]:
@@ -304,26 +286,25 @@ for result_filename in p["result_filenames"]:
                 cam = pose_error_htt.create_camera_model(scene_camera[im_id])
                 if cam.distortion_model.__name__ == "PinholePlaneCameraModel":
                     K = cam.uv_to_window_matrix()
-            elif ("cam_model" in scene_camera[im_id]
-                  and scene_camera[im_id]["cam_model"] == "PinholePlaneCameraModel"):
+            elif "cam_model" in scene_camera[im_id] and scene_camera[im_id]["cam_model"] == "PinholePlaneCameraModel":
                 # Only H3 BOP24 format
                 calib = scene_camera[im_id]["cam_model"]
                 fx, fy, cx, cy = calib["projection_params"][:4]
-                K = np.array([fx,0, cx,
-                              0, fy,cy,
-                              0, 0, 1]).reshape((3,3))
+                K = np.array([fx, 0, cx, 0, fy, cy, 0, 0, 1]).reshape((3, 3))
 
-            if p["error_type"] in ['vsd','cus','proj']:
+            if p["error_type"] in ["vsd", "cus", "proj"]:
                 assert K is not None, "Error type {} is not supported for non pinhole cameras".format(p["error_type"])
             if p["error_type"] in ["mspd"]:
-                assert (K is not None) or (cam is not None), "Dataset {} requires Handa-Tracking-Toolkit as it is a non Pinhole camera (see bop_toolkit/README.md)".format(dataset)
+                assert (K is not None) or (cam is not None), (
+                    "Dataset {} requires Handa-Tracking-Toolkit as it is a non Pinhole camera (see bop_toolkit/README.md)".format(
+                        dataset
+                    )
+                )
 
             # Load the depth image if VSD is selected as the pose error function.
             depth_im = None
             if p["error_type"] == "vsd":
-                depth_path = dp_split["depth_tpath"].format(
-                    scene_id=scene_id, im_id=im_id
-                )
+                depth_path = dp_split["depth_tpath"].format(scene_id=scene_id, im_id=im_id)
                 depth_im = inout.load_depth(depth_path)
                 depth_im *= scene_camera[im_id]["depth_scale"]  # Convert to [mm].
 
@@ -334,8 +315,10 @@ for result_filename in p["result_filenames"]:
                 # We need to re-define the target file for 6D detection tasks because:
                 # 1. For BOP-Classic, the function of calculating object visibility has been changed, we cannot create the exact same number of `visib_count` as in target_filename _bop19.json from GT
                 # so our unit tests with using prediction created from GT fails, and cannot get 100%. Re-loading the target objects from GT make sures the score will be 100%
-                # 2. We want to consider all GT, not only GT>visib_gt_min since we want to ignore estimation matches with GT < visib_gt_min.  
-                im_targets = inout.get_im_targets(im_gt=im_gt, im_gt_info=im_gt_info, visib_gt_min=p["visib_gt_min"], eval_mode=p["eval_mode"])
+                # 2. We want to consider all GT, not only GT>visib_gt_min since we want to ignore estimation matches with GT < visib_gt_min.
+                im_targets = inout.get_im_targets(
+                    im_gt=im_gt, im_gt_info=im_gt_info, visib_gt_min=p["visib_gt_min"], eval_mode=p["eval_mode"]
+                )
 
             for obj_id, target in im_targets.items():
                 # The required number of top estimated poses.
@@ -358,16 +341,13 @@ for result_filename in p["result_filenames"]:
                 # Check the number of estimates.
                 if not p["skip_missing"] and obj_count < n_top_curr:
                     raise ValueError(
-                        "Not enough estimates for scene: {}, im: {}, obj: {} "
-                        "(provided: {}, expected: {})".format(
+                        "Not enough estimates for scene: {}, im: {}, obj: {} (provided: {}, expected: {})".format(
                             scene_id, im_id, obj_id, obj_count, n_top_curr
                         )
                     )
 
                 # Sort the estimates by score (in descending order).
-                obj_ests_sorted = sorted(
-                    enumerate(obj_ests), key=lambda x: x[1]["score"], reverse=True
-                )
+                obj_ests_sorted = sorted(enumerate(obj_ests), key=lambda x: x[1]["score"], reverse=True)
 
                 # Select the required number of top estimated poses.
                 obj_ests_sorted = obj_ests_sorted[slice(0, n_top_curr)]
@@ -396,10 +376,8 @@ for result_filename in p["result_filenames"]:
                         sphere_projections_overlap = None
                         if p["error_type"] in ["vsd", "cus"]:
                             radius = 0.5 * models_info[obj_id]["diameter"]
-                            sphere_projections_overlap = (
-                                misc.overlapping_sphere_projections(
-                                    radius, t_e.squeeze(), t_g.squeeze()
-                                )
+                            sphere_projections_overlap = misc.overlapping_sphere_projections(
+                                radius, t_e.squeeze(), t_g.squeeze()
                             )
 
                         # Check if the bounding spheres of the object in the two poses
@@ -407,9 +385,7 @@ for result_filename in p["result_filenames"]:
                         spheres_overlap = None
                         if p["error_type"] in ["ad", "add", "adi", "mssd"]:
                             center_dist = np.linalg.norm(t_e - t_g)
-                            spheres_overlap = (
-                                center_dist < models_info[obj_id]["diameter"]
-                            )
+                            spheres_overlap = center_dist < models_info[obj_id]["diameter"]
 
                         if p["error_type"] == "vsd":
                             if not sphere_projections_overlap:
@@ -441,9 +417,7 @@ for result_filename in p["result_filenames"]:
                                         K=K,
                                         vsd_deltas=p["vsd_deltas"][dataset],
                                         vsd_taus=p["vsd_taus"],
-                                        vsd_normalized_by_diameter=p[
-                                            "vsd_normalized_by_diameter"
-                                        ],
+                                        vsd_normalized_by_diameter=p["vsd_normalized_by_diameter"],
                                         diameter=models_info[obj_id]["diameter"],
                                         obj_id=obj_id,
                                         step="step",
@@ -523,18 +497,10 @@ for result_filename in p["result_filenames"]:
                                         ]
 
                                 elif p["error_type"] == "add":
-                                    e = [
-                                        pose_error.add(
-                                            R_e, t_e, R_g, t_g, models[obj_id]["pts"]
-                                        )
-                                    ]
+                                    e = [pose_error.add(R_e, t_e, R_g, t_g, models[obj_id]["pts"])]
 
                                 else:  # 'adi'
-                                    e = [
-                                        pose_error.adi(
-                                            R_e, t_e, R_g, t_g, models[obj_id]["pts"]
-                                        )
-                                    ]
+                                    e = [pose_error.adi(R_e, t_e, R_g, t_g, models[obj_id]["pts"])]
 
                         elif p["error_type"] == "cus":
                             if sphere_projections_overlap:
@@ -543,11 +509,7 @@ for result_filename in p["result_filenames"]:
                                 e = [1.0]
 
                         elif p["error_type"] == "proj":
-                            e = [
-                                pose_error.proj(
-                                    R_e, t_e, R_g, t_g, K, models[obj_id]["pts"]
-                                )
-                            ]
+                            e = [pose_error.proj(R_e, t_e, R_g, t_g, K, models[obj_id]["pts"])]
 
                         elif p["error_type"] == "rete":
                             e = [pose_error.re(R_e, R_g), pose_error.te(t_e, t_g)]
@@ -563,7 +525,7 @@ for result_filename in p["result_filenames"]:
 
                         errs[gt_id] = e
                         gt_visib_fracts[gt_id] = gt_visib_fract
-                        
+
                     # Save the calculated errors.
                     im_errs.append(
                         {
@@ -576,9 +538,7 @@ for result_filename in p["result_filenames"]:
                             "gt_visib_fracts": gt_visib_fracts,
                         }
                     )
-                assert (
-                    len(im_errs) == per_image_ests_counter
-                ), f"{len(im_errs)} != {per_image_ests_counter}"
+                assert len(im_errs) == per_image_ests_counter, f"{len(im_errs)} != {per_image_ests_counter}"
             return im_errs
 
         scene_errs = []
@@ -631,10 +591,6 @@ for result_filename in p["result_filenames"]:
             save_errors(error_sign, scene_errs)
 
     time_total = time.time() - time_start
-    logger.info(
-        "Calculation of errors for {} estimates took {}s.".format(
-            ests_counter, time_total
-        )
-    )
+    logger.info("Calculation of errors for {} estimates took {}s.".format(ests_counter, time_total))
 
 logger.info("Done.")

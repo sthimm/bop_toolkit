@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import sys
 import os
 import re
 import time
@@ -16,7 +17,7 @@ from bop_toolkit_lib import misc
 # PARAMETERS (some can be overwritten by the command line arguments below).
 ################################################################################
 p = {
-    # Use generate results from gt files instead of submissions 
+    # Use generate results from gt files instead of submissions
     "gt_from_datasets": [],  # e.g. ['ycbv', 'lmo']
     "renderer_type": "vispy",  # Options: 'vispy', 'cpp', 'python'.
     "use_gpu": config.use_gpu,  # Use torch for the calculation of errors.
@@ -25,7 +26,9 @@ p = {
 }
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--gt_from_datasets", default="", help='Comma separated list of dataset names, e.g. "ycbv,tless,lmo"', type=str)
+parser.add_argument(
+    "--gt_from_datasets", default="", help='Comma separated list of dataset names, e.g. "ycbv,tless,lmo"', type=str
+)
 parser.add_argument("--renderer_type", default=p["renderer_type"])
 parser.add_argument("--use_gpu", action="store_true", default=p["use_gpu"])
 parser.add_argument("--num_workers", default=p["num_workers"])
@@ -34,7 +37,7 @@ parser.add_argument("--num_false_positives", default=0, type=int)
 args = parser.parse_args()
 
 p["renderer_type"] = str(args.renderer_type)
-p["gt_from_datasets"] = args.gt_from_datasets.split(',') if len(args.gt_from_datasets) > 0 else [] 
+p["gt_from_datasets"] = args.gt_from_datasets.split(",") if len(args.gt_from_datasets) > 0 else []
 p["num_workers"] = int(args.num_workers)
 p["use_gpu"] = bool(args.use_gpu)
 p["tolerance"] = float(args.tolerance)
@@ -49,9 +52,15 @@ os.makedirs(LOGS_PATH, exist_ok=True)
 
 # Define the dataset dictionary
 FILE_DICTIONARY = {
-    "lmo_megaPose": ("cnos-fastsammegapose_lmo-test_16ab01bd-f020-4194-9750-d42fc7f875d2.csv", "test_targets_bop19.json"),
+    "lmo_megaPose": (
+        "cnos-fastsammegapose_lmo-test_16ab01bd-f020-4194-9750-d42fc7f875d2.csv",
+        "test_targets_bop19.json",
+    ),
     "lmo_gt": ("gt-pbrreal-rgb-mmodel_lmo-test_lmo.csv", "test_targets_bop19.json"),
-    "tless_megaPose": ("cnos-fastsammegapose_tless-test_94e046a0-42af-495f-8a35-11ce8ee6f217.csv", "test_targets_bop19.json"),
+    "tless_megaPose": (
+        "cnos-fastsammegapose_tless-test_94e046a0-42af-495f-8a35-11ce8ee6f217.csv",
+        "test_targets_bop19.json",
+    ),
     "tless_gt": ("gt-pbrreal-rgb-mmodel_tless-test_tless.csv", "test_targets_bop19.json"),
 }
 
@@ -84,8 +93,7 @@ if len(p["gt_from_datasets"]) > 0:
     RESULT_PATH = "./bop_toolkit_lib/tests/data/results_gt"
     # assuming all concerned datasets are bop24
     FILE_DICTIONARY = {
-        f"{ds}_gt": (f"gt-results_{ds}-test_pose.csv", "test_targets_bop24.json")
-        for ds in p["gt_from_datasets"]
+        f"{ds}_gt": (f"gt-results_{ds}-test_pose.csv", "test_targets_bop24.json") for ds in p["gt_from_datasets"]
     }
     EXPECTED_OUTPUT = {
         f"{ds}_gt": {
@@ -97,13 +105,10 @@ if len(p["gt_from_datasets"]) > 0:
     }
 
 
-
 # read the file
 for dataset_method_name, (file_name, test_targets_name) in FILE_DICTIONARY.items():
     result_file_path = f"{RESULT_PATH}/{file_name}"
-    output_filename = file_name.replace(
-        ".csv", f"_{args.num_false_positives}_false_positives.csv"
-    )
+    output_filename = file_name.replace(".csv", f"_{args.num_false_positives}_false_positives.csv")
     ests = inout.load_bop_results(result_file_path, version="bop19")
     if args.num_false_positives > 0:
         # create dummy estimates
@@ -123,16 +128,14 @@ for dataset_method_name, (file_name, test_targets_name) in FILE_DICTIONARY.items
         misc.log(f"Using {dataset_method_name} with {len(ests)} instances")
 
 # Loop through each entry in the dictionary and execute the command
-for dataset_method_name, (file_name, test_targets_name) in tqdm(
-    FILE_DICTIONARY.items(), desc="Executing..."
-):
+for dataset_method_name, (file_name, test_targets_name) in tqdm(FILE_DICTIONARY.items(), desc="Executing..."):
     log_file_path = f"{LOGS_PATH}/eval_bop24_pose_test_{dataset_method_name}.txt"
     # Remove eval sub path to start clean
-    eval_path_dir = os.path.join(EVAL_PATH, file_name.split('.')[0])
+    eval_path_dir = os.path.join(EVAL_PATH, file_name.split(".")[0])
     if os.path.exists(eval_path_dir):
         shutil.rmtree(eval_path_dir)
     command = [
-        "python",
+        sys.executable,
         "scripts/eval_bop24_pose.py",
         "--renderer_type",
         p["renderer_type"],
@@ -153,10 +156,10 @@ for dataset_method_name, (file_name, test_targets_name) in tqdm(
     command_str = " ".join(command)
     misc.log(f"Executing: {command_str}")
     start_time = time.perf_counter()
-    with open(log_file_path, "a") as output_file: 
+    with open(log_file_path, "a") as output_file:
         returncode = subprocess.run(command, stdout=output_file, stderr=subprocess.STDOUT).returncode
         if returncode != 0:
-            misc.log('FAILED: '+command_str)    
+            misc.log("FAILED: " + command_str)
     end_time = time.perf_counter()
     misc.log(f"Evaluation time for {dataset_method_name}: {end_time - start_time} seconds")
 
@@ -177,10 +180,7 @@ if args.num_false_positives == 0:
             log_content = "".join(last_lines)
 
             # Extract scores using regular expressions
-            scores = {
-                key: float(value)
-                for key, value in re.findall(r"- (\S+): (\S+)", log_content)
-            }
+            scores = {key: float(value) for key, value in re.findall(r"- (\S+): (\S+)", log_content)}
 
             # Compare the extracted scores with the expected scores
             for key, expected_value in EXPECTED_OUTPUT[dataset_name].items():
@@ -189,9 +189,7 @@ if args.num_false_positives == 0:
                     if abs(actual_value - expected_value) < p["tolerance"]:
                         misc.log(f"{dataset_name}: {key} - PASSED")
                     else:
-                        misc.log(
-                            f"{dataset_name}: {key} - FAILED. Expected: {expected_value}, Actual: {actual_value}"
-                        )
+                        misc.log(f"{dataset_name}: {key} - FAILED. Expected: {expected_value}, Actual: {actual_value}")
                 else:
                     misc.log(f"{dataset_name}: {key} - NOT FOUND")
                     misc.log(f"Please check the log file {log_file_path} for more details.")

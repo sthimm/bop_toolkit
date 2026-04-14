@@ -3,6 +3,7 @@
 
 """Evaluation script for the BOP Challenge 2019/2020."""
 
+import sys
 import os
 import time
 import argparse
@@ -74,6 +75,8 @@ p = {
     "results_path": config.results_path,
     # Folder for the calculated pose errors and performance scores.
     "eval_path": config.eval_path,
+    # Folder containing the BOP datasets.
+    "datasets_path": config.datasets_path,
     # File with a list of estimation targets to consider. The file is assumed to
     # be stored in the dataset folder.
     "targets_filename": "test_targets_bop19.json",
@@ -97,10 +100,13 @@ parser.add_argument(
 parser.add_argument("--results_path", type=str, default=p["results_path"])
 parser.add_argument("--eval_path", type=str, default=p["eval_path"])
 parser.add_argument("--targets_filename", type=str, default=p["targets_filename"])
+parser.add_argument("--datasets_path", type=str, default=p["datasets_path"])
 parser.add_argument("--num_workers", type=int, default=p["num_workers"])
 parser.add_argument("--use_gpu", action="store_true", default=p["use_gpu"])
 parser.add_argument("--device", type=str, default=p["device"])
-parser.add_argument("--cleanup_eval", action="store_true", default=False, help="Delete error folders after evaluation (default: False)")
+parser.add_argument(
+    "--cleanup_eval", action="store_true", default=False, help="Delete error folders after evaluation (default: False)"
+)
 args = parser.parse_args()
 
 result_filenames = args.result_filenames.split(",")
@@ -132,9 +138,11 @@ for result_filename in result_filenames:
     # Evaluate the pose estimates.
     for error in p["errors"]:
         # Calculate error of the pose estimates.
-        calc_error_script, is_gpu_script_used = misc.get_eval_calc_errors_script_name(args.use_gpu, error["type"], dataset)
+        calc_error_script, is_gpu_script_used = misc.get_eval_calc_errors_script_name(
+            args.use_gpu, error["type"], dataset
+        )
         calc_errors_cmd = [
-            "python",
+            sys.executable,
             os.path.join(
                 os.path.dirname(os.path.realpath(__file__)),
                 calc_error_script,
@@ -145,6 +153,7 @@ for result_filename in result_filenames:
             "--renderer_type={}".format(args.renderer_type),
             "--results_path={}".format(args.results_path),
             "--eval_path={}".format(args.eval_path),
+            "--datasets_path={}".format(args.datasets_path),
             "--targets_filename={}".format(args.targets_filename),
             "--max_sym_disc_step={}".format(p["max_sym_disc_step"]),
             "--skip_missing=1",
@@ -153,15 +162,11 @@ for result_filename in result_filenames:
         if is_gpu_script_used:
             calc_errors_cmd.append(f"--device={args.device}")
         if error["type"] == "vsd":
-            vsd_deltas_str = ",".join(
-                ["{}:{}".format(k, v) for k, v in error["vsd_deltas"].items()]
-            )
+            vsd_deltas_str = ",".join(["{}:{}".format(k, v) for k, v in error["vsd_deltas"].items()])
             calc_errors_cmd += [
                 "--vsd_deltas={}".format(vsd_deltas_str),
                 "--vsd_taus={}".format(",".join(map(str, error["vsd_taus"]))),
-                "--vsd_normalized_by_diameter={}".format(
-                    error["vsd_normalized_by_diameter"]
-                ),
+                "--vsd_normalized_by_diameter={}".format(error["vsd_normalized_by_diameter"]),
             ]
 
         logger.info("Running: " + " ".join(calc_errors_cmd))
@@ -193,22 +198,19 @@ for result_filename in result_filenames:
         for error_sign, error_dir_path in error_dir_paths.items():
             for correct_th in error["correct_th"]:
                 calc_scores_cmd = [
-                    "python",
+                    sys.executable,
                     os.path.join(
                         os.path.dirname(os.path.realpath(__file__)),
                         "eval_calc_scores.py",
                     ),
                     "--error_dir_paths={}".format(error_dir_path),
                     "--eval_path={}".format(args.eval_path),
+                    "--datasets_path={}".format(args.datasets_path),
                     "--targets_filename={}".format(args.targets_filename),
                     "--visib_gt_min={}".format(p["visib_gt_min"]),
                 ]
 
-                calc_scores_cmd += [
-                    "--correct_th_{}={}".format(
-                        error["type"], ",".join(map(str, correct_th))
-                    )
-                ]
+                calc_scores_cmd += ["--correct_th_{}={}".format(error["type"], ",".join(map(str, correct_th)))]
                 calc_scores_cmds.append(calc_scores_cmd)
 
         if args.num_workers == 1:
@@ -229,9 +231,7 @@ for result_filename in result_filenames:
                 score_sign = misc.get_score_signature(correct_th, p["visib_gt_min"])
 
                 scores_filename = "scores_{}.json".format(score_sign)
-                scores_path = os.path.join(
-                    args.eval_path, result_name, error_sign, scores_filename
-                )
+                scores_path = os.path.join(args.eval_path, result_name, error_sign, scores_filename)
 
                 # Load the scores.
                 logger.info("Loading calculated scores from: {}".format(scores_path))
@@ -256,9 +256,7 @@ for result_filename in result_filenames:
     # Calculate the final scores.
     final_scores = {}
     for error in p["errors"]:
-        final_scores["bop19_average_recall_{}".format(error["type"])] = average_recalls[
-            error["type"]
-        ]
+        final_scores["bop19_average_recall_{}".format(error["type"])] = average_recalls[error["type"]]
 
     # Final score for the given dataset.
     final_scores["bop19_average_recall"] = np.mean(
@@ -277,7 +275,6 @@ for result_filename in result_filenames:
     for score_name, score_value in final_scores.items():
         logger.info("- {}: {}".format(score_name, score_value))
 
-    
 
 total_eval_time = time.time() - eval_time_start
 logger.info("Evaluation took {}s.".format(total_eval_time))
