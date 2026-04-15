@@ -74,12 +74,12 @@ p = {
         {
             "n_top": -1,
             "type": "te",
-            "correct_th": [[10.0]],  # cm
+            "correct_th": [[5.0]],  # cm
         },
         {
             "n_top": -1,
             "type": "re",
-            "correct_th": [[10.0]],  # deg
+            "correct_th": [[5.0]],  # deg
         },
     ],
     # Minimum visible surface fraction of a valid GT pose.
